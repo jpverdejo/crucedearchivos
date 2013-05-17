@@ -57,6 +57,8 @@ class Cruce:
         #Una vez cargados todos los archivos empezamos el proceso de cruce
         self.cruce()
 
+        print "=== Cruce terminado correctamente ==="
+
     #Carga un archivo linea a linea, es agnostico a la clase que se va a ocupar
     def load_file(self, file, className, dictionary):
         #Todos los archivos de data van en el directorio "Data"
