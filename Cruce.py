@@ -176,7 +176,7 @@ class Cruce:
                 fecha_creacion = cuenta.fecha_creacion
             else:
                 nombre = tarjeta.nombre
-                rut = tarjeta.nombre
+                rut = tarjeta.rut
                 fecha_creacion = tarjeta.fecha_creacion
 
             #Se instancia "Resultado" con los valores seteados anteriormente
@@ -198,8 +198,16 @@ class Cruce:
                 cupo_nacional,
                 cupo_internacional)
 
+            #Si esta definida la variable resultado.descripcion origen significa que tenemos el
+            #banco al que corresponde, por lo que se guarda en ese archivo
+            #si no se guarda en otros.txt
+            if resultado.descripcion_origen == '':
+                result_file = 'otros.txt'
+            else:
+                result_file = resultado.descripcion_origen + ".txt"
+
             #Se guardan los resultados en el archivo correspondiente
-            resultado.save_resultado()
+            resultado.save_resultado(result_file)
 
 #Iniciamos el proceso
 Cruce()
