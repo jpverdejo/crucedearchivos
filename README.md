@@ -30,3 +30,24 @@
  	```python Cruce.py```
  - Los resultados se guardan en los archivos ```/Results/<nombre_del_banco>.txt```
    - Si el cruce no tiene informacion del banco se guarda en ```/Results/otros.txt```
+
+#Inyector
+######Estructura de archivos - USACH 
+
+###Requisitos:
+	- Python 2.7
+	- Biblioteca "MySQL for Python" instalada en el sistema (http://sourceforge.net/projects/mysql-python/)
+
+###Premisas:
+ - Existe el FDL /FDL/resultado.fdl
+
+ - El archivo de entrada tiene el formato indicado por ese FDL
+
+ - El software tiene permisos de escritura en el directorio /Results
+
+ - El FDL tiene formato: ```nombre_variable_1#nombre_variable_2#nombre_variable_3```
+
+###Ejecución:
+ - Para la ejecución el comando es:
+ 	```python Inyector.py <archivo de entrada>```
+ - Los resultados se guardan en los archivos ```/Results/<cargados, erroneos, duplicados, fallaCarga><Y-m-d_H-i-s>.txt```
