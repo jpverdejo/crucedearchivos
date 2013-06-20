@@ -213,19 +213,17 @@ class Inyector:
         print
         print "Total de registros de entrada: %s" % total
         print
+        print "Directorio de resultados: ./Results/%s/" % directory
+        print
         print "==================================================="
         print
         print "Registros cargados correctamente: %s %s" % (num_cargados, porc_cargados)
-        print "Archivo de respaldo: %s" % filename_cargados
         print
         print "Registros erroneos: %s %s" % (num_erroneos, porc_erroneos)
-        print "Archivo de respaldo: %s" % filename_erroneos
         print
         print "Registros duplicados: %s %s" % (num_duplicados, porc_duplicados)
-        print "Archivo de respaldo: %s" % filename_duplicados
         print
         print "Registros con fallas al cargar DB: %s %s" % (num_fallaCarga, porc_fallaCarga)
-        print "Archivo de respaldo: %s" % filename_fallaCarga
         print
         print "==================================================="
 

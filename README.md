@@ -35,8 +35,8 @@
 ######Estructura de archivos - USACH 
 
 ###Requisitos:
-	- Python 2.7
-	- Biblioteca "MySQL for Python" instalada en el sistema (http://sourceforge.net/projects/mysql-python/)
+ - Python 2.7
+ - Biblioteca "MySQL for Python" instalada en el sistema (http://sourceforge.net/projects/mysql-python/)
 
 ###Premisas:
  - Existe el FDL /FDL/resultado.fdl
@@ -50,4 +50,4 @@
 ###Ejecución:
  - Para la ejecución el comando es:
  	```python Inyector.py <archivo de entrada>```
- - Los resultados se guardan en los archivos ```/Results/<cargados, erroneos, duplicados, fallaCarga><Y-m-d_H-i-s>.txt```
+ - Los resultados se guardan en los archivos ```/Results/<Y-m-d_H-i-s>/<cargados, erroneos, duplicados, fallaCarga>.txt```
