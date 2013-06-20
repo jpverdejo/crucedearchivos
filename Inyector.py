@@ -2,6 +2,7 @@ from Resultados import Resultado
 import MySQLdb
 import datetime
 import sys
+import os
 
 
 class Inyector:
@@ -41,23 +42,114 @@ class Inyector:
             print "El archivo de entrada (%s) no existe" % (filename)
             return
 
+        # Creamos el conector a la base de datos
         self.con = MySQLdb.connect(host=DB_host, user=DB_user, passwd=DB_pass, db=DB_name)
 
+        # Creamos el cursor a la base de datos
         self.cursor = self.con.cursor()
 
+        # Validamos que los datos no sean erroneos
         self.validate()
 
+        # Validamos que no sean duplicados, si esto no falla lo cargamos a la DB
         self.findDuplicated()
 
-        self.loadDB()
+        # Guardamos los resultados e imprimimos
+        self.saveAndPrint()
 
+
+    #Carga un archivo linea a linea, es agnostico a la clase que se va a ocupar
+    def load_file(self, file, className, dictionary):
+        f = open(file)
+        for line in f:
+            #Removemos los "\n" que recibe cuando lee la linea completa
+            line = line.rstrip()
+
+            #Se instancia la clase
+            instance = className()
+
+            #Le pasamos la linea leida al metodo load_cuenta,
+            #La clase se preocupa del FDL y devuelve el indice
+            instance_id = instance.load_line(line)
+
+            #Se agrega el objeto creado al diccionario indicado en la llamada
+            objVar = getattr(self, dictionary)
+            objVar[instance_id] = instance
+            setattr(self, dictionary, objVar)
+
+    def validate(self):
+        #Iteramos sobre todos los reclamos
+        for i, reclamo in self.reclamos.items():
+            validate = reclamo.validate()
+            if not validate['isValid']:
+                self.erroneos.append(reclamo)
+                self.errors[reclamo.codigo_reclamo] = validate['errors']
+                del self.reclamos[reclamo.codigo_reclamo]
+
+    def findDuplicated(self):
+        #Iteramos sobre todos los reclamos
+        for i, reclamo in self.reclamos.items():
+            duplicated = reclamo.isDuplicated(self.cursor)
+            if duplicated['isDuplicated']:
+                self.duplicados.append(reclamo)
+                self.errors[reclamo.codigo_reclamo] = duplicated['errors']
+                del self.reclamos[reclamo.codigo_reclamo]
+            else:
+                self.loadDB(reclamo)
+
+    def loadDB(self, reclamo):
+        try:
+            # Solo por comodidad
+            cursor = self.cursor
+
+            # Tanto la DB InnoDB como la biblioteca MySQL soportan transacciones, por lo que haremos uso de ellas
+            # Como revisamos que si los primary keys que existen en la db tengan la misma informacion asociada solo agreregamos los registros necesarios
+            if not cursor.execute("SELECT * FROM clientes WHERE rut = %s", reclamo.rut):
+                cursor.execute("INSERT INTO clientes (rut, nombre) VALUES (%s, %s)", (reclamo.rut, reclamo.nombre))
+
+            if not cursor.execute("SELECT * FROM codigos WHERE codigo = %s", reclamo.codigo_origen):
+                cursor.execute("INSERT INTO codigos (codigo, descripcion) VALUES (%s, %s)", (reclamo.codigo_origen, reclamo.descripcion_origen))
+
+            if not cursor.execute("SELECT * FROM productos WHERE codigo_producto = %s", reclamo.codigo_producto):
+                cursor.execute("INSERT INTO productos (codigo_producto, tipo_contrato, fecha) VALUES (%s, %s, %s)", (reclamo.codigo_producto, reclamo.tipo_contrato, reclamo.formatDate(reclamo.fecha_sernac)))
+
+            if reclamo.n_cuenta:
+                if not cursor.execute("SELECT * FROM cuentas WHERE numero_cuenta = %s", reclamo.n_cuenta):
+                    cursor.execute("INSERT INTO cuentas (numero_cuenta, linea_sobregiro, fecha_creacion, rut) VALUES (%s, %s, %s, %s)", (reclamo.n_cuenta, reclamo.linea_sobregiro, reclamo.formatDate(reclamo.fecha_creacion), reclamo.rut))
+
+            if reclamo.n_tarjeta:
+                if not cursor.execute("SELECT * FROM tarjetas WHERE numero_tarjeta = %s", reclamo.n_tarjeta):
+                    cursor.execute("INSERT INTO tarjetas (numero_tarjeta, fecha_creacion, fecha_vencimiento, cupo_nacional, cupo_internacional, rut) VALUES (%s, %s, %s, %s, %s, %s)", (reclamo.n_tarjeta, reclamo.formatDate(reclamo.fecha_creacion), reclamo.formatDate(reclamo.fecha_vencimiento),  reclamo.cupo_nacional, reclamo.cupo_internacional, reclamo.rut))
+
+            # Este registro, por supuesto, siempre debe ser ingresado
+            cursor.execute("INSERT INTO reclamos (codigo_reclamo, codigo_origen, codigo_producto, numero_producto, fecha) VALUES (%s, %s, %s, %s, %s)", (reclamo.codigo_reclamo, reclamo.codigo_origen, reclamo.codigo_producto, reclamo.codigo_producto, reclamo.formatDate(reclamo.fecha_reclamo)))
+
+            # Si no se ha lanzado la excepcion commiteamos los cambios :)
+            self.con.commit()
+
+            # Y lo agregamos al listado de cargas correctas :)
+            self.cargados.append(reclamo)
+
+        except MySQLdb.Error, e:
+            # Si salto la excepcion hacemos rollback de los cambios y agregamos el reclamo a la lista de fallidos
+            if self.con:
+                self.con.rollback()
+
+            self.fallaCarga.append(reclamo)
+
+    def saveAndPrint(self):
         now = datetime.datetime.now()
-        sufix_files = now.strftime("_%Y-%m-%d_%H-%M-%S")
+        directory = now.strftime("%Y-%m-%d_%H-%M-%S")
 
-        filename_erroneos = "erroneos%s.txt" % sufix_files
-        filename_duplicados = "duplicados%s.txt" % sufix_files
-        filename_fallaCarga = "fallaCarga%s.txt" % sufix_files
-        filename_cargados = "cargados%s.txt" % sufix_files
+        # Creamos el directorio donde guardaremos los datos
+        if not os.path.exists("./Results/" + directory):
+            os.makedirs("./Results/" + directory)
+
+        # Seteamos los nombres de archivos de resultados
+        filename_erroneos = "%s/erroneos.txt" % directory
+        filename_duplicados = "%s/duplicados.txt" % directory
+        filename_fallaCarga = "%s/fallaCarga.txt" % directory
+        filename_cargados = "%s/cargados.txt" % directory
 
         # Creamos el archivo de resultado con los registros erroneos y sus errores
         for reclamo in self.erroneos:
@@ -137,84 +229,6 @@ class Inyector:
         print
         print "==================================================="
 
-    #Carga un archivo linea a linea, es agnostico a la clase que se va a ocupar
-    def load_file(self, file, className, dictionary):
-        f = open(file)
-        for line in f:
-            #Removemos los "\n" que recibe cuando lee la linea completa
-            line = line.rstrip()
-
-            #Se instancia la clase
-            instance = className()
-
-            #Le pasamos la linea leida al metodo load_cuenta,
-            #La clase se preocupa del FDL y devuelve el indice
-            instance_id = instance.load_line(line)
-
-            #Se agrega el objeto creado al diccionario indicado en la llamada
-            objVar = getattr(self, dictionary)
-            objVar[instance_id] = instance
-            setattr(self, dictionary, objVar)
-
-    def validate(self):
-        #Iteramos sobre todos los reclamos
-        for i, reclamo in self.reclamos.items():
-            validate = reclamo.validate()
-            if not validate['isValid']:
-                self.erroneos.append(reclamo)
-                self.errors[reclamo.codigo_reclamo] = validate['errors']
-                del self.reclamos[reclamo.codigo_reclamo]
-
-    def findDuplicated(self):
-        #Iteramos sobre todos los reclamos
-        for i, reclamo in self.reclamos.items():
-            duplicated = reclamo.isDuplicated(self.cursor)
-            if duplicated['isDuplicated']:
-                self.duplicados.append(reclamo)
-                self.errors[reclamo.codigo_reclamo] = duplicated['errors']
-                del self.reclamos[reclamo.codigo_reclamo]
-
-    def loadDB(self):
-        #Iteramos sobre todos los reclamos
-        for i, reclamo in self.reclamos.items():
-            try:
-                # Solo por comodidad
-                cursor = self.cursor
-
-                # Tanto la DB InnoDB como la biblioteca MySQL soportan transacciones, por lo que haremos uso de ellas
-                # Como revisamos que si los primary keys que existen en la db tengan la misma informacion asociada solo agreregamos los registros necesarios
-                if not cursor.execute("SELECT * FROM clientes WHERE rut = %s", reclamo.rut):
-                    cursor.execute("INSERT INTO clientes (rut, nombre) VALUES (%s, %s)", (reclamo.rut, reclamo.nombre))
-
-                if not cursor.execute("SELECT * FROM codigos WHERE codigo = %s", reclamo.codigo_origen):
-                    cursor.execute("INSERT INTO codigos (codigo, descripcion) VALUES (%s, %s)", (reclamo.codigo_origen, reclamo.descripcion_origen))
-
-                if not cursor.execute("SELECT * FROM productos WHERE codigo_producto = %s", reclamo.codigo_producto):
-                    cursor.execute("INSERT INTO productos (codigo_producto, tipo_contrato, fecha) VALUES (%s, %s, %s)", (reclamo.codigo_producto, reclamo.tipo_contrato, reclamo.formatDate(reclamo.fecha_sernac)))
-
-                if reclamo.n_cuenta:
-                    if not cursor.execute("SELECT * FROM cuentas WHERE numero_cuenta = %s", reclamo.n_cuenta):
-                        cursor.execute("INSERT INTO cuentas (numero_cuenta, linea_sobregiro, fecha_creacion, rut) VALUES (%s, %s, %s, %s)", (reclamo.n_cuenta, reclamo.linea_sobregiro, reclamo.formatDate(reclamo.fecha_creacion), reclamo.rut))
-
-                if reclamo.n_tarjeta:
-                    if not cursor.execute("SELECT * FROM tarjetas WHERE numero_tarjeta = %s", reclamo.n_tarjeta):
-                        cursor.execute("INSERT INTO tarjetas (numero_tarjeta, fecha_creacion, fecha_vencimiento, cupo_nacional, cupo_internacional, rut) VALUES (%s, %s, %s, %s, %s, %s)", (reclamo.n_tarjeta, reclamo.formatDate(reclamo.fecha_creacion), reclamo.formatDate(reclamo.fecha_vencimiento),  reclamo.cupo_nacional, reclamo.cupo_internacional, reclamo.rut))
-
-                # Este registro, por supuesto, siempre debe ser ingresado
-                cursor.execute("INSERT INTO reclamos (codigo_reclamo, codigo_origen, codigo_producto, numero_producto, fecha) VALUES (%s, %s, %s, %s, %s)", (reclamo.codigo_reclamo, reclamo.codigo_origen, reclamo.codigo_producto, reclamo.codigo_producto, reclamo.formatDate(reclamo.fecha_reclamo)))
-
-                # Si no se ha lanzado la excepcion commiteamos los cambios :)
-                self.con.commit()
-
-                # Y lo agregamos al listado de cargas correctas :)
-                self.cargados.append(reclamo)
-
-            except MySQLdb.Error, e:
-                # Si salto la excepcion hacemos rollback de los cambios y agregamos el reclamo a la lista de fallidos
-                if self.con:
-                    self.con.rollback()
-
-                self.fallaCarga.append(reclamo)
 
 
 # Iniciamos el inyector

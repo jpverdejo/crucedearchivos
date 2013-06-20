@@ -180,8 +180,10 @@ class Resultado:
         if cursor.execute("SELECT * FROM productos WHERE codigo_producto = %s", self.codigo_producto):
             producto = cursor.fetchone()
 
-            tipo_contrato = producto[1]
-            fecha_sernac = producto[2]
+            tipo_contrato = str(producto[1])
+            
+            # Dejamos la fecha en formato YYYYMMDD
+            fecha_sernac = producto[2].strftime("%Y%m%d")
 
             if tipo_contrato != self.tipo_contrato:
                 error.append("El tipo de contrato asociado al codigo de producto en la base de datos no coincide")
@@ -192,10 +194,12 @@ class Resultado:
         if cursor.execute("SELECT * FROM tarjetas WHERE numero_tarjeta = %s", self.n_tarjeta):
             tarjeta = cursor.fetchone()
 
-            fecha_creacion = tarjeta[1]
-            fecha_vencimiento = tarjeta[2]
-            cupo_nacional = tarjeta[3]
-            cupo_internacional = tarjeta[4]
+            fecha_creacion = tarjeta[1].strftime("%Y%m%d")
+            fecha_vencimiento = tarjeta[2].strftime("%Y%m%d")
+
+            cupo_nacional = str(tarjeta[3])
+            cupo_internacional = str(tarjeta[4])
+
             rut = tarjeta[5]
 
             if fecha_creacion != self.fecha_creacion:
@@ -205,7 +209,7 @@ class Resultado:
             if cupo_nacional != self.cupo_nacional:
                 error.append("El cupo nacional asociado a la tarjeta en la base de datos no coincide")
             if cupo_internacional != self.cupo_internacional:
-                error.append("El cupo nacional asociado a la tarjeta en la base de datos no coincide")
+                error.append("El cupo internacional asociado a la tarjeta en la base de datos no coincide")
             if rut != self.rut:
                 error.append("El RUT asociado a la tarjeta en la base de datos no coincide")
 
@@ -213,14 +217,15 @@ class Resultado:
         if cursor.execute("SELECT * FROM cuentas WHERE numero_cuenta = %s", self.n_cuenta):
             cuenta = cursor.fetchone()
 
-            linea_sobregiro = cuenta[1]
-            fecha_creacion = cuenta[2]
+            linea_sobregiro = str(cuenta[1])
+            
+            fecha_creacion = cuenta[2].strftime("%Y%m%d")
             rut = cuenta[3]
 
             if fecha_creacion != self.fecha_creacion:
                 error.append("La fecha de creacion de la cuenta existente en la base de datos no coincide")
             if linea_sobregiro != self.linea_sobregiro:
-                error.append("La informacion sobre la linea de credito de la cuenta en la base de datos no coincide")
+                error.append("La informacion sobre la linea de sobregiro de la cuenta en la base de datos no coincide")
             if rut != self.rut:
                 error.append("El RUT asociado a la cuenta en la base de datos no coincide")
 
